@@ -9,6 +9,7 @@ import type {
 
 const DEFAULT_SETTINGS: Settings = {
   groqApiKey: '',
+  senderName: '',
   gmailConnected: false,
 }
 
@@ -36,6 +37,7 @@ type LegacySettings = Settings & { openaiApiKey?: string; openrouterApiKey?: str
 function normalizeSettings(raw: LegacySettings): Settings {
   return {
     groqApiKey: raw.groqApiKey || raw.openrouterApiKey || raw.openaiApiKey || '',
+    senderName: raw.senderName ?? '',
     gmailConnected: raw.gmailConnected ?? false,
   }
 }

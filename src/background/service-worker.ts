@@ -25,6 +25,7 @@ async function runEmailGeneration(payload: {
   resumeText: string
   jobDescription: string
   hrEmail: string
+  senderName: string
 }): Promise<void> {
   await setGeneration({
     status: 'generating',
@@ -40,6 +41,7 @@ async function runEmailGeneration(payload: {
       payload.resumeText,
       payload.jobDescription,
       payload.hrEmail,
+      payload.senderName,
     )
     await setGeneration({ status: 'done', result })
     chrome.action.setBadgeText({ text: '✓' })

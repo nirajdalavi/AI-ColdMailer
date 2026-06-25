@@ -12,7 +12,7 @@ import {
 } from '../lib/storage'
 import { startEmailGeneration } from '../lib/generation'
 import { getPageText, sendGmailEmail } from '../lib/gmail'
-import type { GeneratedEmail, GenerationState } from '../types'
+import type { GeneratedEmail, GenerationState, Settings } from '../types'
 
 type Step = 'input' | 'preview'
 
@@ -54,6 +54,7 @@ export function ComposeTab() {
   const [error, setError] = useState('')
   const [hasResume, setHasResume] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
+  const [hasSenderName, setHasSenderName] = useState(false)
   const hydrated = useRef(false)
 
   const persistDraft = useCallback((email: string, description: string) => {
@@ -78,6 +79,7 @@ export function ComposeTab() {
     ]).then(([resume, settings, draft, generation]) => {
       setHasResume(!!resume)
       setHasApiKey(!!settings.groqApiKey)
+      setHasSenderName(!!settings.senderName.trim())
       setHrEmail(draft.hrEmail)
       setJobDescription(draft.jobDescription)
       syncFromGeneration(generation)
@@ -96,6 +98,11 @@ export function ComposeTab() {
       }
       if (changes.generation?.newValue) {
         syncFromGeneration(changes.generation.newValue as GenerationState)
+      }
+      if (changes.settings?.newValue) {
+        const settings = changes.settings.newValue as Settings
+        setHasApiKey(!!settings.groqApiKey)
+        setHasSenderName(!!settings.senderName?.trim())
       }
     }
 
@@ -147,12 +154,16 @@ export function ComposeTab() {
       if (!settings.groqApiKey) {
         throw new Error('Add your Groq API key in Settings')
       }
+      if (!settings.senderName.trim()) {
+        throw new Error('Add your name in Settings')
+      }
 
       await startEmailGeneration({
         apiKey: settings.groqApiKey,
         resumeText: resume.extractedText,
         jobDescription,
         hrEmail: hrEmail.trim(),
+        senderName: settings.senderName.trim(),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed')
@@ -209,12 +220,13 @@ export function ComposeTab() {
     setError('')
   }
 
-  if (!hasResume || !hasApiKey) {
+  if (!hasResume || !hasApiKey || !hasSenderName) {
     return (
       <div className="setup-prompt">
         <h3>Setup required</h3>
         <ul>
           {!hasResume && <li>Upload your resume in the <strong>Resume</strong> tab</li>}
+          {!hasSenderName && <li>Add your name in <strong>Settings</strong></li>}
           {!hasApiKey && <li>Add your Groq API key in <strong>Settings</strong></li>}
         </ul>
       </div>

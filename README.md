@@ -136,13 +136,13 @@ If `.env` is missing or empty, Settings will show *"Gmail is not available in th
 
 You should see **Connected**. To switch accounts: **Disconnect** → **Connect Gmail** again.
 
-### Step 6 — Add your Groq API key
+### Step 6 — Configure Settings
 
 Still in **Settings**:
 
-1. Get a free key at [console.groq.com/keys](https://console.groq.com/keys)
-2. Paste it (starts with `gsk_`)
-3. Click **Save API Key**
+1. Enter **Your name** — appears in the email sign-off (`Best regards, [your name]`)
+2. Get a free Groq key at [console.groq.com/keys](https://console.groq.com/keys) and paste it (starts with `gsk_`)
+3. Click **Save Settings**
 
 Uses **Llama 3.3 70B** — ~1,000 free requests/day on Groq's free tier.
 
@@ -171,7 +171,7 @@ Leave `npm run dev` running in a terminal while you work — code changes rebuil
 - [ ] Chrome Extension OAuth client with correct extension **Item ID**
 - [ ] `.env` created from `.env.example` with `VITE_GMAIL_CLIENT_ID`
 - [ ] Dev server rebuilt after `.env` + extension refreshed in Chrome
-- [ ] Groq API key saved in Settings
+- [ ] Your name + Groq API key saved in Settings
 - [ ] Gmail **Connected** in Settings
 - [ ] Resume uploaded
 
@@ -211,7 +211,7 @@ Past sends are logged in **History**.
 | **Compose** | Job details → generate → preview → send |
 | **Resume** | Upload or replace PDF |
 | **History** | Past applications |
-| **Settings** | Groq API key + Gmail connection |
+| **Settings** | Your name, Groq API key, Gmail connection |
 
 ---
 

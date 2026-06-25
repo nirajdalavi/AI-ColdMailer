@@ -18,10 +18,10 @@ I'm currently pursuing my MS in Computer Science at USC (graduating May 2026) an
 I've attached my resume for your review and would love the opportunity to connect.
 
 Best regards,
-Niraj Dalavi
+[Your Name]
 ---
 
-Return JSON with these fields (content only — sign-off is added automatically):
+Return JSON with these fields (content only — greeting and sign-off are added automatically):
 
 - subject: Like "Interest in [Job Title]" using the exact role title from the job description. Use a plain hyphen (-) only. NO location, NO city, NO state. Plain ASCII.
 - openingParagraph: Start with "I hope you're doing well." Then mention applying for the specific role at the company and expressing interest.
@@ -62,6 +62,7 @@ function assembleBody(
   opening: string,
   middle: string,
   closing: string,
+  senderName: string,
 ): string {
   const hi = greeting.trim().endsWith(',') ? greeting.trim() : `${greeting.trim()},`
   return normalizeEmailBody(
@@ -75,12 +76,16 @@ function assembleBody(
       normalizeParagraph(closing),
       '',
       'Best regards,',
-      'Niraj Dalavi',
+      senderName.trim(),
     ].join('\n'),
   )
 }
 
-function parseGeneratedEmail(content: string, hrEmail: string): GeneratedEmail {
+function parseGeneratedEmail(
+  content: string,
+  hrEmail: string,
+  senderName: string,
+): GeneratedEmail {
   const trimmed = content.trim()
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
   const jsonStr = (fenced?.[1] ?? trimmed).trim()
@@ -101,6 +106,7 @@ function parseGeneratedEmail(content: string, hrEmail: string): GeneratedEmail {
         parsed.openingParagraph,
         parsed.middleParagraph,
         parsed.closingParagraph,
+        senderName,
       ),
       company: parsed.company ?? 'Unknown',
       jobTitle: parsed.jobTitle ?? 'Unknown',
@@ -110,7 +116,7 @@ function parseGeneratedEmail(content: string, hrEmail: string): GeneratedEmail {
   if (parsed.subject && parsed.body) {
     return {
       subject: sanitizeSubject(parsed.subject),
-      body: normalizeLegacyBody(parsed.body),
+      body: normalizeLegacyBody(parsed.body, senderName),
       company: parsed.company ?? 'Unknown',
       jobTitle: parsed.jobTitle ?? 'Unknown',
     }
@@ -119,9 +125,9 @@ function parseGeneratedEmail(content: string, hrEmail: string): GeneratedEmail {
   throw new Error('Invalid email format from model')
 }
 
-function normalizeLegacyBody(raw: string): string {
+function normalizeLegacyBody(raw: string, senderName: string): string {
   let text = raw.replace(/\r\n/g, '\n').trim()
-  text = text.replace(/\n*Best regards,?\s*\n*Niraj Dalavi\s*$/i, '').trim()
+  text = text.replace(/\n*Best regards,?\s*\n[\s\S]*$/i, '').trim()
 
   const greetingMatch = text.match(/^(Hi [^,\n]+,)/i)
   if (!greetingMatch) return text
@@ -134,7 +140,7 @@ function normalizeLegacyBody(raw: string): string {
     const closing = paragraphs[paragraphs.length - 1]
     const middle = paragraphs[paragraphs.length - 2]
     const opening = paragraphs.slice(0, -2).join(' ')
-    return assembleBody(greeting, opening, middle, closing)
+    return assembleBody(greeting, opening, middle, closing, senderName)
   }
 
   return text
@@ -145,6 +151,7 @@ export async function generateEmail(
   resumeText: string,
   jobDescription: string,
   hrEmail: string,
+  senderName: string,
 ): Promise<GeneratedEmail> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -184,7 +191,7 @@ export async function generateEmail(
   if (!content) throw new Error('No response from Groq')
 
   try {
-    return parseGeneratedEmail(content, hrEmail)
+    return parseGeneratedEmail(content, hrEmail, senderName)
   } catch {
     throw new Error('Could not parse email from model response. Try generating again.')
   }

@@ -4,6 +4,7 @@ import { checkGmailAuth, connectGmailInteractive, signOutGmail } from '../lib/gm
 
 export function SettingsTab() {
   const [apiKey, setApiKey] = useState('')
+  const [senderName, setSenderName] = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailAvailable, setGmailAvailable] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -16,6 +17,7 @@ export function SettingsTab() {
 
     getSettings().then((s) => {
       setApiKey(s.groqApiKey)
+      setSenderName(s.senderName)
       setGmailConnected(s.gmailConnected)
     })
     if (manifest.oauth2?.client_id) {
@@ -23,8 +25,16 @@ export function SettingsTab() {
     }
   }, [])
 
+  const persistSettings = async (gmailConnectedOverride?: boolean) => {
+    await saveSettings({
+      groqApiKey: apiKey,
+      senderName: senderName.trim(),
+      gmailConnected: gmailConnectedOverride ?? gmailConnected,
+    })
+  }
+
   const handleSave = async () => {
-    await saveSettings({ groqApiKey: apiKey, gmailConnected })
+    await persistSettings()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -35,7 +45,7 @@ export function SettingsTab() {
     try {
       await connectGmailInteractive()
       setGmailConnected(true)
-      await saveSettings({ groqApiKey: apiKey, gmailConnected: true })
+      await persistSettings(true)
     } catch (err) {
       setGmailConnected(false)
       setGmailError(err instanceof Error ? err.message : 'Failed to connect Gmail')
@@ -49,7 +59,7 @@ export function SettingsTab() {
     try {
       await signOutGmail()
       setGmailConnected(false)
-      await saveSettings({ groqApiKey: apiKey, gmailConnected: false })
+      await persistSettings(false)
     } finally {
       setLoading(false)
     }
@@ -57,6 +67,17 @@ export function SettingsTab() {
 
   return (
     <div className="settings-tab">
+      <div className="field">
+        <label>Your name</label>
+        <input
+          type="text"
+          placeholder="Jane Doe"
+          value={senderName}
+          onChange={(e) => setSenderName(e.target.value)}
+        />
+        <p className="hint">Used in the email sign-off: Best regards, [your name]</p>
+      </div>
+
       <div className="field">
         <label>Groq API Key</label>
         <input
@@ -75,7 +96,7 @@ export function SettingsTab() {
       </div>
 
       <button className="btn primary full" onClick={handleSave}>
-        {saved ? 'Saved!' : 'Save API Key'}
+        {saved ? 'Saved!' : 'Save Settings'}
       </button>
 
       <hr />

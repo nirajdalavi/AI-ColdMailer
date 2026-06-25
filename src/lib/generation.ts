@@ -5,6 +5,7 @@ export async function startEmailGeneration(payload: {
   resumeText: string
   jobDescription: string
   hrEmail: string
+  senderName: string
 }): Promise<void> {
   const response = await sendMessage({
     type: 'START_GENERATE_EMAIL',

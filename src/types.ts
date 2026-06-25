@@ -7,6 +7,7 @@ export interface ResumeData {
 
 export interface Settings {
   groqApiKey: string
+  senderName: string
   gmailConnected: boolean
 }
 
@@ -62,6 +63,7 @@ export type MessageType =
         resumeText: string
         jobDescription: string
         hrEmail: string
+        senderName: string
       }
     }
 

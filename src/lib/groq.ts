@@ -1,6 +1,6 @@
 import type { GeneratedEmail } from '../types'
 import { buildGreeting } from './email-name'
-import { normalizeParagraph, normalizeEmailBody } from './email-format'
+import { normalizeParagraph, normalizeEmailBody, buildEmailSubject, formatJobTitle } from './email-format'
 
 const MODEL = 'llama-3.3-70b-versatile'
 
@@ -23,12 +23,12 @@ Best regards,
 
 Return JSON with these fields (content only — greeting and sign-off are added automatically):
 
-- subject: Like "Interest in [Job Title]" using the exact role title from the job description. Use a plain hyphen (-) only. NO location, NO city, NO state. Plain ASCII.
+- subject: ignored — formatted automatically as "Interest in [Job Title]" in code
 - openingParagraph: Start with "I hope you're doing well." Then mention applying for the specific role at the company and expressing interest.
 - middleParagraph: 2-3 sentences — education/status from resume, relevant skills/experience, what about this company or role excites you.
 - closingParagraph: Short line about attached resume and wanting to connect (like the example).
-- company: Company name from job description
-- jobTitle: Job title from job description
+- company: Company name from job description (not from this example)
+- jobTitle: Role title from the job description only — no location, no company name in this field
 
 Do NOT include a greeting field — the greeting is set from the recipient email automatically.
 
@@ -46,15 +46,55 @@ interface ParsedFields {
   body?: string
 }
 
-function sanitizeSubject(raw: string): string {
-  return raw
-    .replace(/[\u2013\u2014\u2012]/g, ' - ')
-    .replace(/Ã¢Â€Â"|â€"|â€"/g, ' - ')
-    .replace(/[^\x20-\x7E]/g, '')
-    .replace(/\s*-\s*[A-Za-z][A-Za-z\s.]*,\s*[A-Z]{2}\s*$/i, '')
-    .replace(/,\s*[A-Za-z][A-Za-z\s.]*,\s*[A-Z]{2}\s*$/i, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
+function parseGeneratedEmail(
+  content: string,
+  hrEmail: string,
+  senderName: string,
+): GeneratedEmail {
+  const trimmed = content.trim()
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const jsonStr = (fenced?.[1] ?? trimmed).trim()
+
+  const parsed = JSON.parse(jsonStr) as ParsedFields
+  const greeting = buildGreeting(hrEmail)
+  const jobTitle = formatJobTitle(parsed.jobTitle || extractJobTitleFromSubject(parsed.subject))
+
+  if (
+    parsed.openingParagraph &&
+    parsed.middleParagraph &&
+    parsed.closingParagraph &&
+    (parsed.subject || parsed.jobTitle)
+  ) {
+    return {
+      subject: buildEmailSubject(jobTitle, parsed.subject),
+      body: assembleBody(
+        greeting,
+        parsed.openingParagraph,
+        parsed.middleParagraph,
+        parsed.closingParagraph,
+        senderName,
+      ),
+      company: parsed.company?.trim() || 'Unknown',
+      jobTitle,
+    }
+  }
+
+  if (parsed.subject && parsed.body) {
+    return {
+      subject: buildEmailSubject(jobTitle, parsed.subject),
+      body: normalizeLegacyBody(parsed.body, senderName),
+      company: parsed.company?.trim() || 'Unknown',
+      jobTitle,
+    }
+  }
+
+  throw new Error('Invalid email format from model')
+}
+
+function extractJobTitleFromSubject(subject?: string): string {
+  if (!subject?.trim()) return 'Role'
+  const match = subject.trim().match(/^Interest\s+in\s+(.+)$/i)
+  return match?.[1]?.trim() || subject.trim()
 }
 
 function assembleBody(
@@ -79,50 +119,6 @@ function assembleBody(
       senderName.trim(),
     ].join('\n'),
   )
-}
-
-function parseGeneratedEmail(
-  content: string,
-  hrEmail: string,
-  senderName: string,
-): GeneratedEmail {
-  const trimmed = content.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const jsonStr = (fenced?.[1] ?? trimmed).trim()
-
-  const parsed = JSON.parse(jsonStr) as ParsedFields
-  const greeting = buildGreeting(hrEmail)
-
-  if (
-    parsed.openingParagraph &&
-    parsed.middleParagraph &&
-    parsed.closingParagraph &&
-    parsed.subject
-  ) {
-    return {
-      subject: sanitizeSubject(parsed.subject),
-      body: assembleBody(
-        greeting,
-        parsed.openingParagraph,
-        parsed.middleParagraph,
-        parsed.closingParagraph,
-        senderName,
-      ),
-      company: parsed.company ?? 'Unknown',
-      jobTitle: parsed.jobTitle ?? 'Unknown',
-    }
-  }
-
-  if (parsed.subject && parsed.body) {
-    return {
-      subject: sanitizeSubject(parsed.subject),
-      body: normalizeLegacyBody(parsed.body, senderName),
-      company: parsed.company ?? 'Unknown',
-      jobTitle: parsed.jobTitle ?? 'Unknown',
-    }
-  }
-
-  throw new Error('Invalid email format from model')
 }
 
 function normalizeLegacyBody(raw: string, senderName: string): string {

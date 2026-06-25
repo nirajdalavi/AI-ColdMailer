@@ -48,3 +48,51 @@ export function base64EncodeUtf8(text: string): string {
   }
   return btoa(binary)
 }
+
+const TITLE_ACRONYMS = new Set([
+  'AI', 'ML', 'UI', 'UX', 'API', 'AWS', 'GCP', 'SQL', 'NLP', 'LLM', 'HR', 'IT', 'SDE', 'VP', 'QA', 'PM',
+  'IOS', 'II', 'III', 'IV', 'SWE', 'FE', 'BE',
+])
+
+function titleCaseWord(word: string): string {
+  if (!word) return word
+  const letters = word.replace(/[^a-zA-Z0-9]/g, '')
+  if (!letters) return word
+
+  const upper = letters.toUpperCase()
+  if (TITLE_ACRONYMS.has(upper)) return upper
+  if (upper === 'IOS') return 'iOS'
+  if (letters.length <= 4 && letters === letters.toUpperCase()) return upper
+
+  const lower = word.toLowerCase()
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
+/** Title-case a job title; keeps hyphen-separated segments and common acronyms (AI, ML, …). */
+export function formatJobTitle(title: string): string {
+  const cleaned = title
+    .replace(/[\u2013\u2014\u2012]/g, ' - ')
+    .replace(/Ã¢Â€Â"|â€"|â€"/g, ' - ')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s*-\s*[A-Za-z][A-Za-z\s.]*,\s*[A-Z]{2}\s*$/i, '')
+    .replace(/,\s*[A-Za-z][A-Za-z\s.]*,\s*[A-Z]{2}\s*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  if (!cleaned) return 'Role'
+
+  return cleaned
+    .split(/\s*-\s*/)
+    .map((segment) => segment.split(/\s+/).filter(Boolean).map(titleCaseWord).join(' '))
+    .join(' - ')
+}
+
+/** Build a consistent subject: "Interest in AI Engineer Role" */
+export function buildEmailSubject(jobTitle: string, rawSubject?: string): string {
+  let title = jobTitle.trim()
+  if (!title && rawSubject) {
+    const match = rawSubject.match(/^Interest\s+in\s+(.+)$/i)
+    title = match?.[1]?.trim() ?? rawSubject.trim()
+  }
+  return `Interest in ${formatJobTitle(title || 'Role')}`
+}

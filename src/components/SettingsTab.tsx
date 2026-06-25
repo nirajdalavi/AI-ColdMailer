@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getSettings, saveSettings } from '../lib/storage'
 import { checkGmailAuth, connectGmailInteractive, signOutGmail } from '../lib/gmail'
 
@@ -10,6 +10,8 @@ export function SettingsTab() {
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
   const [gmailError, setGmailError] = useState('')
+  const hydrated = useRef(false)
+  const isInitialSync = useRef(true)
 
   useEffect(() => {
     const manifest = chrome.runtime.getManifest()
@@ -19,25 +21,37 @@ export function SettingsTab() {
       setApiKey(s.groqApiKey)
       setSenderName(s.senderName)
       setGmailConnected(s.gmailConnected)
+      hydrated.current = true
     })
     if (manifest.oauth2?.client_id) {
       checkGmailAuth().then(setGmailConnected)
     }
   }, [])
 
-  const persistSettings = async (gmailConnectedOverride?: boolean) => {
-    await saveSettings({
-      groqApiKey: apiKey,
-      senderName: senderName.trim(),
-      gmailConnected: gmailConnectedOverride ?? gmailConnected,
-    })
-  }
+  const persistSettings = useCallback(
+    async (partial: { groqApiKey?: string; senderName?: string; gmailConnected?: boolean }) => {
+      await saveSettings(partial)
+    },
+    [],
+  )
 
-  const handleSave = async () => {
-    await persistSettings()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
+  useEffect(() => {
+    if (!hydrated.current) return
+    if (isInitialSync.current) {
+      isInitialSync.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      void persistSettings({
+        groqApiKey: apiKey,
+        senderName: senderName.trim(),
+      }).then(() => {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [apiKey, senderName, persistSettings])
 
   const handleGmailConnect = async () => {
     setLoading(true)
@@ -45,7 +59,7 @@ export function SettingsTab() {
     try {
       await connectGmailInteractive()
       setGmailConnected(true)
-      await persistSettings(true)
+      await persistSettings({ gmailConnected: true })
     } catch (err) {
       setGmailConnected(false)
       setGmailError(err instanceof Error ? err.message : 'Failed to connect Gmail')
@@ -59,7 +73,7 @@ export function SettingsTab() {
     try {
       await signOutGmail()
       setGmailConnected(false)
-      await persistSettings(false)
+      await persistSettings({ gmailConnected: false })
     } finally {
       setLoading(false)
     }
@@ -95,9 +109,7 @@ export function SettingsTab() {
         </p>
       </div>
 
-      <button className="btn primary full" onClick={handleSave}>
-        {saved ? 'Saved!' : 'Save Settings'}
-      </button>
+      {saved && <p className="hint saved-hint">Settings saved</p>}
 
       <hr />
 

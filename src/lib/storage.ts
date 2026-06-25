@@ -77,8 +77,9 @@ export async function getSettings(): Promise<Settings> {
   return storage.settings
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
-  await setStorage({ settings })
+export async function saveSettings(partial: Partial<Settings>): Promise<void> {
+  const current = await getSettings()
+  await setStorage({ settings: { ...current, ...partial } })
 }
 
 export async function getHistory(): Promise<ApplicationRecord[]> {
@@ -89,6 +90,15 @@ export async function getHistory(): Promise<ApplicationRecord[]> {
 export async function addToHistory(record: ApplicationRecord): Promise<void> {
   const history = await getHistory()
   await setStorage({ history: [record, ...history] })
+}
+
+export async function removeFromHistory(id: string): Promise<void> {
+  const history = await getHistory()
+  await setStorage({ history: history.filter((record) => record.id !== id) })
+}
+
+export async function clearHistory(): Promise<void> {
+  await setStorage({ history: [] })
 }
 
 export async function getGenerationState(): Promise<GenerationState> {

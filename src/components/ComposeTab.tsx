@@ -1,11 +1,49 @@
-import { useState, useEffect } from 'react'
-import { getResume, getSettings } from '../lib/storage'
-import { generateEmail } from '../lib/openrouter'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  getResume,
+  getSettings,
+  getGenerationState,
+  getComposeDraft,
+  saveComposeDraft,
+  setGenerationState,
+  clearGenerationState,
+  clearComposeDraft,
+  addToHistory,
+} from '../lib/storage'
+import { startEmailGeneration } from '../lib/generation'
 import { getPageText, sendGmailEmail } from '../lib/gmail'
-import { addToHistory } from '../lib/storage'
-import type { GeneratedEmail } from '../types'
+import type { GeneratedEmail, GenerationState } from '../types'
 
 type Step = 'input' | 'preview'
+
+function applyGenerationState(
+  state: GenerationState,
+  setters: {
+    setEmail: (v: GeneratedEmail | null) => void
+    setStep: (v: Step) => void
+    setLoading: (v: boolean) => void
+    setError: (v: string) => void
+  },
+) {
+  if (state.status === 'generating') {
+    setters.setLoading(true)
+    setters.setError('')
+    setters.setStep('input')
+  } else if (state.status === 'done' && state.result) {
+    setters.setLoading(false)
+    setters.setError('')
+    setters.setEmail(state.result)
+    setters.setStep('preview')
+    chrome.action.setBadgeText({ text: '' })
+  } else if (state.status === 'error') {
+    setters.setLoading(false)
+    setters.setError(state.error ?? 'Generation failed')
+    setters.setStep('input')
+    chrome.action.setBadgeText({ text: '' })
+  } else {
+    setters.setLoading(false)
+  }
+}
 
 export function ComposeTab() {
   const [hrEmail, setHrEmail] = useState('')
@@ -16,24 +54,76 @@ export function ComposeTab() {
   const [error, setError] = useState('')
   const [hasResume, setHasResume] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
+  const hydrated = useRef(false)
 
-  useEffect(() => {
-    Promise.all([getResume(), getSettings()]).then(([resume, settings]) => {
-      setHasResume(!!resume)
-      setHasApiKey(!!settings.openrouterApiKey)
+  const persistDraft = useCallback((email: string, description: string) => {
+    void saveComposeDraft({ hrEmail: email, jobDescription: description })
+  }, [])
+
+  const syncFromGeneration = useCallback((state: GenerationState) => {
+    applyGenerationState(state, {
+      setEmail,
+      setStep,
+      setLoading,
+      setError,
     })
   }, [])
 
+  useEffect(() => {
+    Promise.all([
+      getResume(),
+      getSettings(),
+      getComposeDraft(),
+      getGenerationState(),
+    ]).then(([resume, settings, draft, generation]) => {
+      setHasResume(!!resume)
+      setHasApiKey(!!settings.groqApiKey)
+      setHrEmail(draft.hrEmail)
+      setJobDescription(draft.jobDescription)
+      syncFromGeneration(generation)
+      hydrated.current = true
+    })
+
+    const onStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string,
+    ) => {
+      if (area !== 'local') return
+      if (changes.composeDraft?.newValue) {
+        const draft = changes.composeDraft.newValue as { hrEmail: string; jobDescription: string }
+        setHrEmail(draft.hrEmail)
+        setJobDescription(draft.jobDescription)
+      }
+      if (changes.generation?.newValue) {
+        syncFromGeneration(changes.generation.newValue as GenerationState)
+      }
+    }
+
+    chrome.storage.onChanged.addListener(onStorageChange)
+    return () => chrome.storage.onChanged.removeListener(onStorageChange)
+  }, [syncFromGeneration])
+
+  useEffect(() => {
+    if (!hydrated.current) return
+    const timer = setTimeout(() => persistDraft(hrEmail, jobDescription), 300)
+    return () => clearTimeout(timer)
+  }, [hrEmail, jobDescription, persistDraft])
+
+  useEffect(() => {
+    if (!hydrated.current || !email || step !== 'preview') return
+    const timer = setTimeout(() => {
+      void setGenerationState({ status: 'done', result: email })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [email, step])
+
   const handleUseCurrentPage = async () => {
-    setLoading(true)
     setError('')
     try {
       const text = await getPageText()
       setJobDescription(text)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read page')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -49,22 +139,23 @@ export function ComposeTab() {
 
     setLoading(true)
     setError('')
+    await saveComposeDraft({ hrEmail, jobDescription: jobDescription })
 
     try {
       const [resume, settings] = await Promise.all([getResume(), getSettings()])
       if (!resume) throw new Error('Upload your resume first (Resume tab)')
-      if (!settings.openrouterApiKey) throw new Error('Add your OpenRouter API key in Settings')
+      if (!settings.groqApiKey) {
+        throw new Error('Add your Groq API key in Settings')
+      }
 
-      const generated = await generateEmail(
-        settings.openrouterApiKey,
-        resume.extractedText,
+      await startEmailGeneration({
+        apiKey: settings.groqApiKey,
+        resumeText: resume.extractedText,
         jobDescription,
-      )
-      setEmail(generated)
-      setStep('preview')
+        hrEmail: hrEmail.trim(),
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed')
-    } finally {
       setLoading(false)
     }
   }
@@ -98,6 +189,8 @@ export function ComposeTab() {
         status: 'sent',
       })
 
+      await clearGenerationState()
+      await clearComposeDraft()
       setHrEmail('')
       setJobDescription('')
       setEmail(null)
@@ -109,13 +202,20 @@ export function ComposeTab() {
     }
   }
 
+  const handleBack = async () => {
+    await clearGenerationState()
+    setEmail(null)
+    setStep('input')
+    setError('')
+  }
+
   if (!hasResume || !hasApiKey) {
     return (
       <div className="setup-prompt">
         <h3>Setup required</h3>
         <ul>
           {!hasResume && <li>Upload your resume in the <strong>Resume</strong> tab</li>}
-          {!hasApiKey && <li>Add your OpenRouter API key in <strong>Settings</strong> (free tier available)</li>}
+          {!hasApiKey && <li>Add your Groq API key in <strong>Settings</strong></li>}
         </ul>
       </div>
     )
@@ -124,10 +224,8 @@ export function ComposeTab() {
   if (step === 'preview' && email) {
     return (
       <div className="compose-preview">
-        <div className="field">
-          <label>To</label>
-          <input type="email" value={hrEmail} onChange={(e) => setHrEmail(e.target.value)} />
-        </div>
+        <p className="preview-heading">Review before sending</p>
+
         <div className="field">
           <label>Subject</label>
           <input
@@ -136,10 +234,16 @@ export function ComposeTab() {
             onChange={(e) => setEmail({ ...email, subject: e.target.value })}
           />
         </div>
+
+        <div className="field">
+          <label>To</label>
+          <input type="email" value={hrEmail} onChange={(e) => setHrEmail(e.target.value)} />
+        </div>
+
         <div className="field">
           <label>Body</label>
           <textarea
-            rows={12}
+            rows={14}
             value={email.body}
             onChange={(e) => setEmail({ ...email, body: e.target.value })}
           />
@@ -148,7 +252,7 @@ export function ComposeTab() {
         {error && <p className="error">{error}</p>}
 
         <div className="actions">
-          <button className="btn secondary" onClick={() => setStep('input')} disabled={loading}>
+          <button className="btn secondary" onClick={handleBack} disabled={loading}>
             Back
           </button>
           <button className="btn primary" onClick={handleSend} disabled={loading}>
@@ -161,6 +265,12 @@ export function ComposeTab() {
 
   return (
     <div className="compose-input">
+      {loading && (
+        <p className="generating-banner">
+          Generating email… You can close this popup — we'll notify you when it's ready.
+        </p>
+      )}
+
       <div className="field">
         <label>HR Email</label>
         <input
@@ -168,6 +278,7 @@ export function ComposeTab() {
           placeholder="recruiter@company.com"
           value={hrEmail}
           onChange={(e) => setHrEmail(e.target.value)}
+          disabled={loading}
         />
       </div>
 
@@ -187,6 +298,7 @@ export function ComposeTab() {
           placeholder="Paste the job description here…"
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
+          disabled={loading}
         />
       </div>
 

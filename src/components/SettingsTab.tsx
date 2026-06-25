@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSettings, saveSettings } from '../lib/storage'
-import { checkGmailAuth, connectGmail, signOutGmail } from '../lib/gmail'
+import { checkGmailAuth, connectGmailInteractive, signOutGmail } from '../lib/gmail'
 
 export function SettingsTab() {
   const [apiKey, setApiKey] = useState('')
@@ -8,13 +8,14 @@ export function SettingsTab() {
   const [gmailAvailable, setGmailAvailable] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [gmailError, setGmailError] = useState('')
 
   useEffect(() => {
     const manifest = chrome.runtime.getManifest()
     setGmailAvailable(!!manifest.oauth2?.client_id)
 
     getSettings().then((s) => {
-      setApiKey(s.openrouterApiKey)
+      setApiKey(s.groqApiKey)
       setGmailConnected(s.gmailConnected)
     })
     if (manifest.oauth2?.client_id) {
@@ -23,17 +24,21 @@ export function SettingsTab() {
   }, [])
 
   const handleSave = async () => {
-    await saveSettings({ openrouterApiKey: apiKey, gmailConnected })
+    await saveSettings({ groqApiKey: apiKey, gmailConnected })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   const handleGmailConnect = async () => {
     setLoading(true)
+    setGmailError('')
     try {
-      const connected = await connectGmail()
-      setGmailConnected(connected)
-      await saveSettings({ openrouterApiKey: apiKey, gmailConnected: connected })
+      await connectGmailInteractive()
+      setGmailConnected(true)
+      await saveSettings({ groqApiKey: apiKey, gmailConnected: true })
+    } catch (err) {
+      setGmailConnected(false)
+      setGmailError(err instanceof Error ? err.message : 'Failed to connect Gmail')
     } finally {
       setLoading(false)
     }
@@ -44,7 +49,7 @@ export function SettingsTab() {
     try {
       await signOutGmail()
       setGmailConnected(false)
-      await saveSettings({ openrouterApiKey: apiKey, gmailConnected: false })
+      await saveSettings({ groqApiKey: apiKey, gmailConnected: false })
     } finally {
       setLoading(false)
     }
@@ -53,19 +58,19 @@ export function SettingsTab() {
   return (
     <div className="settings-tab">
       <div className="field">
-        <label>OpenRouter API Key</label>
+        <label>Groq API Key</label>
         <input
           type="password"
-          placeholder="sk-or-…"
+          placeholder="gsk_…"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
         />
         <p className="hint">
           Free at{' '}
-          <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
-            openrouter.ai/keys
+          <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
+            console.groq.com/keys
           </a>
-          . Uses free models — no credit card required.
+          . Uses Llama 3.3 70B — fast, 1,000 free requests/day.
         </p>
       </div>
 
@@ -105,6 +110,8 @@ export function SettingsTab() {
         ) : (
           <p className="hint">Gmail is not available in this build.</p>
         )}
+
+        {gmailError && <p className="error">{gmailError}</p>}
       </div>
     </div>
   )

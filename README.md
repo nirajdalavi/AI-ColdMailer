@@ -8,7 +8,7 @@ Chrome extension for job outreach: save your resume once, paste a job descriptio
 
 1. Install from the Chrome Web Store (one click)
 2. Open the extension → **Settings**
-3. Get a free API key at [openrouter.ai/keys](https://openrouter.ai/keys) and paste it in
+3. Get a free API key at [console.groq.com/keys](https://console.groq.com/keys) and paste it in
 4. Click **Connect Gmail**
 5. Upload your resume in the **Resume** tab
 6. Start composing in the **Compose** tab
@@ -58,7 +58,7 @@ See [docs/PRIVACY.md](docs/PRIVACY.md). Host this file publicly for the Chrome W
 
 - React 19 + TypeScript, Chrome Manifest V3
 - `chrome.storage.local` — all user data stays on device
-- OpenRouter (`openrouter/free`) — free AI models
+- Groq API (`llama-3.3-70b-versatile`) — free tier, fast inference
 - Gmail API — send from user's account
 
 ## License

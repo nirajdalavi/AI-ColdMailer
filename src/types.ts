@@ -6,7 +6,7 @@ export interface ResumeData {
 }
 
 export interface Settings {
-  openrouterApiKey: string
+  groqApiKey: string
   gmailConnected: boolean
 }
 
@@ -28,10 +28,25 @@ export interface GeneratedEmail {
   jobTitle: string
 }
 
+export interface GenerationState {
+  status: 'idle' | 'generating' | 'done' | 'error'
+  hrEmail: string
+  jobDescription: string
+  result?: GeneratedEmail
+  error?: string
+}
+
+export interface ComposeDraft {
+  hrEmail: string
+  jobDescription: string
+}
+
 export interface StorageSchema {
   resume: ResumeData | null
   settings: Settings
   history: ApplicationRecord[]
+  generation: GenerationState
+  composeDraft: ComposeDraft
 }
 
 export type MessageType =
@@ -40,6 +55,15 @@ export type MessageType =
   | { type: 'CHECK_GMAIL_AUTH' }
   | { type: 'CONNECT_GMAIL' }
   | { type: 'GMAIL_SIGN_OUT' }
+  | {
+      type: 'START_GENERATE_EMAIL'
+      payload: {
+        apiKey: string
+        resumeText: string
+        jobDescription: string
+        hrEmail: string
+      }
+    }
 
 export interface GmailSendPayload {
   to: string

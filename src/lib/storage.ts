@@ -1,21 +1,41 @@
-import type { ApplicationRecord, ResumeData, Settings, StorageSchema } from '../types'
+import type {
+  ApplicationRecord,
+  ComposeDraft,
+  GenerationState,
+  ResumeData,
+  Settings,
+  StorageSchema,
+} from '../types'
 
 const DEFAULT_SETTINGS: Settings = {
-  openrouterApiKey: '',
+  groqApiKey: '',
   gmailConnected: false,
+}
+
+const DEFAULT_GENERATION: GenerationState = {
+  status: 'idle',
+  hrEmail: '',
+  jobDescription: '',
+}
+
+const DEFAULT_COMPOSE_DRAFT: ComposeDraft = {
+  hrEmail: '',
+  jobDescription: '',
 }
 
 const DEFAULT_STORAGE: StorageSchema = {
   resume: null,
   settings: DEFAULT_SETTINGS,
   history: [],
+  generation: DEFAULT_GENERATION,
+  composeDraft: DEFAULT_COMPOSE_DRAFT,
 }
 
-type LegacySettings = Settings & { openaiApiKey?: string }
+type LegacySettings = Settings & { openaiApiKey?: string; openrouterApiKey?: string }
 
 function normalizeSettings(raw: LegacySettings): Settings {
   return {
-    openrouterApiKey: raw.openrouterApiKey || raw.openaiApiKey || '',
+    groqApiKey: raw.groqApiKey || raw.openrouterApiKey || raw.openaiApiKey || '',
     gmailConnected: raw.gmailConnected ?? false,
   }
 }
@@ -67,4 +87,33 @@ export async function getHistory(): Promise<ApplicationRecord[]> {
 export async function addToHistory(record: ApplicationRecord): Promise<void> {
   const history = await getHistory()
   await setStorage({ history: [record, ...history] })
+}
+
+export async function getGenerationState(): Promise<GenerationState> {
+  const storage = await getStorage()
+  return storage.generation ?? DEFAULT_GENERATION
+}
+
+export async function setGenerationState(
+  partial: Partial<GenerationState>,
+): Promise<void> {
+  const current = await getGenerationState()
+  await setStorage({ generation: { ...current, ...partial } })
+}
+
+export async function clearGenerationState(): Promise<void> {
+  await setStorage({ generation: DEFAULT_GENERATION })
+}
+
+export async function getComposeDraft(): Promise<ComposeDraft> {
+  const storage = await getStorage()
+  return storage.composeDraft ?? DEFAULT_COMPOSE_DRAFT
+}
+
+export async function saveComposeDraft(draft: ComposeDraft): Promise<void> {
+  await setStorage({ composeDraft: draft })
+}
+
+export async function clearComposeDraft(): Promise<void> {
+  await setStorage({ composeDraft: DEFAULT_COMPOSE_DRAFT })
 }

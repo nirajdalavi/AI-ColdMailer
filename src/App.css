@@ -235,6 +235,24 @@ textarea:focus {
   margin-bottom: 6px;
 }
 
+.generating-banner {
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--primary-hover);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.preview-heading {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+
 .resume-card {
   display: flex;
   gap: 12px;

@@ -1,5 +1,29 @@
 import type { GmailSendPayload, MessageResponse } from '../types'
 
+function parseToken(token: chrome.identity.GetAuthTokenResult | undefined): string {
+  if (!token) throw new Error('No auth token received')
+  const tokenStr = typeof token === 'string' ? token : token.token
+  if (!tokenStr) throw new Error('No auth token received')
+  return tokenStr
+}
+
+export function connectGmailInteractive(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive: true }, (token) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message))
+        return
+      }
+      try {
+        parseToken(token)
+        resolve()
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('Auth failed'))
+      }
+    })
+  })
+}
+
 export function sendMessage<T = unknown>(
   message: { type: string; payload?: unknown },
 ): Promise<MessageResponse & { data?: T }> {
@@ -16,11 +40,6 @@ export function sendMessage<T = unknown>(
 
 export async function checkGmailAuth(): Promise<boolean> {
   const response = await sendMessage<boolean>({ type: 'CHECK_GMAIL_AUTH' })
-  return response.success && response.data === true
-}
-
-export async function connectGmail(): Promise<boolean> {
-  const response = await sendMessage<boolean>({ type: 'CONNECT_GMAIL' })
   return response.success && response.data === true
 }
 

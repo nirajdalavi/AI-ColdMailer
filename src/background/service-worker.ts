@@ -1,4 +1,56 @@
 import type { GmailSendPayload, MessageResponse, MessageType } from '../types'
+import { generateEmail } from '../lib/groq'
+import {
+  base64EncodeUtf8,
+  normalizeEmailBody,
+  plainBodyToHtml,
+} from '../lib/email-format'
+
+const DEFAULT_GENERATION = {
+  status: 'idle' as const,
+  hrEmail: '',
+  jobDescription: '',
+}
+
+async function setGeneration(
+  partial: Record<string, unknown>,
+): Promise<void> {
+  const stored = await chrome.storage.local.get({ generation: DEFAULT_GENERATION })
+  const current = stored.generation ?? DEFAULT_GENERATION
+  await chrome.storage.local.set({ generation: { ...current, ...partial } })
+}
+
+async function runEmailGeneration(payload: {
+  apiKey: string
+  resumeText: string
+  jobDescription: string
+  hrEmail: string
+}): Promise<void> {
+  await setGeneration({
+    status: 'generating',
+    hrEmail: payload.hrEmail,
+    jobDescription: payload.jobDescription,
+    result: undefined,
+    error: undefined,
+  })
+
+  try {
+    const result = await generateEmail(
+      payload.apiKey,
+      payload.resumeText,
+      payload.jobDescription,
+      payload.hrEmail,
+    )
+    await setGeneration({ status: 'done', result })
+    chrome.action.setBadgeText({ text: '✓' })
+    chrome.action.setBadgeBackgroundColor({ color: '#34d399' })
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Generation failed'
+    await setGeneration({ status: 'error', error })
+    chrome.action.setBadgeText({ text: '!' })
+    chrome.action.setBadgeBackgroundColor({ color: '#f87171' })
+  }
+}
 
 function getAuthToken(interactive: boolean): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -21,6 +73,10 @@ function getAuthToken(interactive: boolean): Promise<string> {
 
 function buildMimeMessage(payload: GmailSendPayload): string {
   const boundary = `boundary_${Date.now()}`
+  const body = normalizeEmailBody(payload.body)
+  const html = plainBodyToHtml(body)
+  const htmlBase64 = base64EncodeUtf8(html)
+
   const lines = [
     `To: ${payload.to}`,
     `Subject: ${payload.subject}`,
@@ -28,10 +84,10 @@ function buildMimeMessage(payload: GmailSendPayload): string {
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
     `--${boundary}`,
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 7bit',
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
     '',
-    payload.body,
+    htmlBase64,
     '',
     `--${boundary}`,
     `Content-Type: application/pdf; name="${payload.attachmentFileName}"`,
@@ -90,12 +146,8 @@ async function checkGmailAuth(): Promise<boolean> {
 }
 
 async function connectGmail(): Promise<boolean> {
-  try {
-    await getAuthToken(true)
-    return true
-  } catch {
-    return false
-  }
+  await getAuthToken(true)
+  return true
 }
 
 async function signOutGmail(): Promise<void> {
@@ -168,6 +220,11 @@ chrome.runtime.onMessage.addListener(
           case 'GET_PAGE_TEXT': {
             const text = await getPageText()
             sendResponse({ success: true, data: text })
+            break
+          }
+          case 'START_GENERATE_EMAIL': {
+            void runEmailGeneration(message.payload)
+            sendResponse({ success: true })
             break
           }
           default:

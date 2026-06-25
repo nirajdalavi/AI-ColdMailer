@@ -13,7 +13,7 @@ Before you start, make sure you have:
 | Requirement | Notes |
 |-------------|-------|
 | **Git** | To clone this repo |
-| **Node.js 18+** | For `npm install`, `npm run dev`, and building |
+| **Node.js 18+** | For `npm install` and `npm run build` |
 | **Google Chrome** | Extension runs in Chrome |
 | **Groq account** (free) | [console.groq.com](https://console.groq.com) — powers AI generation |
 | **Gmail account** | Your email inbox — one-time connect in Settings so you can send with one click |
@@ -34,15 +34,15 @@ cd AI-ColdMailer
 npm install
 ```
 
-### Step 2 — Start dev server and load in Chrome
+### Step 2 — Build and load in Chrome
 
-Run the dev server (rebuilds `dist/` automatically when you change code):
+The repo does **not** include a `dist/` folder — it is gitignored. You create it by building:
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Keep this terminal running. In a new terminal or after the first build finishes, load the extension:
+This outputs a `dist/` folder. Load it in Chrome:
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode** (top right)
@@ -113,13 +113,13 @@ VITE_GMAIL_CLIENT_ID=123456789-xxxx.apps.googleusercontent.com
 
 Only `VITE_GMAIL_CLIENT_ID` is required. The Groq API key goes in the extension UI (Step 6), not in `.env`.
 
-If `npm run dev` is still running from Step 2, it will rebuild automatically when you save `.env`. Otherwise run:
+Rebuild so the OAuth client ID is baked in:
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Then go to `chrome://extensions` → click the **refresh** icon on AI ColdMailer (needed after OAuth client ID changes).
+Then go to `chrome://extensions` → click the **refresh** icon on AI ColdMailer.
 
 If `.env` is missing or empty, Settings will show *"Gmail is not available in this build."*
 
@@ -142,9 +142,8 @@ Still in **Settings**:
 
 1. Enter **Your name** — appears in the email sign-off (`Best regards, [your name]`)
 2. Get a free Groq key at [console.groq.com/keys](https://console.groq.com/keys) and paste it (starts with `gsk_`)
-3. Click **Save Settings**
 
-Uses **Llama 3.3 70B** — ~1,000 free requests/day on Groq's free tier.
+Settings save automatically as you type.
 
 ### Step 7 — Upload your resume
 
@@ -156,21 +155,19 @@ Stored locally in Chrome — one resume at a time. Use **Replace Resume** when y
 
 ### Step 8 — You're ready
 
-Setup is complete. Pin the extension from Chrome's puzzle menu for quick access.
-
-Leave `npm run dev` running in a terminal while you work — code changes rebuild `dist/` automatically; click refresh on the extension card in `chrome://extensions` to pick them up.
+Setup is complete. Pin the extension from Chrome's puzzle menu for quick access. You do **not** need to keep a terminal running — the extension runs in Chrome on its own.
 
 **Setup checklist**
 
 - [ ] `npm install`
-- [ ] `npm run dev` running
+- [ ] `npm run build` (creates `dist/`)
 - [ ] Extension loaded from `dist/` in Chrome
 - [ ] Gmail API enabled in Google Cloud
 - [ ] OAuth consent screen + `gmail.send` scope
 - [ ] Your Gmail added as a **Test user**
 - [ ] Chrome Extension OAuth client with correct extension **Item ID**
 - [ ] `.env` created from `.env.example` with `VITE_GMAIL_CLIENT_ID`
-- [ ] Dev server rebuilt after `.env` + extension refreshed in Chrome
+- [ ] `npm run build` again after `.env` + extension refreshed in Chrome
 - [ ] Your name + Groq API key saved in Settings
 - [ ] Gmail **Connected** in Settings
 - [ ] Resume uploaded
@@ -215,15 +212,17 @@ Past sends are logged in **History**.
 
 ---
 
-## Development commands
+## Development commands (optional)
+
+Only needed if you are **changing the code**, not for normal use.
 
 | Command | When to use |
 |---------|-------------|
-| `npm run dev` | **Day-to-day development** — watches files, rebuilds `dist/` on save (use this) |
-| `npm run build` | One-off production build (e.g. before packaging) |
+| `npm run build` | **Setup and normal use** — creates/updates `dist/` (run this) |
+| `npm run dev` | Active development — watches files and rebuilds `dist/` on save |
 | `npm run package` | Build + zip for Chrome Web Store → `release/ai-coldmailer.zip` |
 
-**Typical workflow:** run `npm run dev` in a terminal, load `dist/` once in Chrome, then refresh the extension in `chrome://extensions` after changes. You only need `npm run build` if you are not using the dev server.
+After `npm run build`, refresh the extension in `chrome://extensions` if you changed config or code.
 
 ---
 

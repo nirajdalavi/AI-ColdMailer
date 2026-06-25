@@ -1,8 +1,8 @@
 # AI ColdMailer
 
-Chrome extension for job outreach: upload your resume once, paste a job description, generate a tailored cold email with AI, review it, and send through Gmail with your resume attached.
+Chrome extension for job outreach: upload your resume once, paste a job description, generate a tailored cold email with AI, review it, and **send with one click** — resume attached automatically.
 
-**No backend server.** Your resume, API keys, and history stay in your browser. Email is only sent when you click send.
+**No backend server.** Your resume, API keys, and history stay in your browser. Nothing goes out until you hit Send.
 
 ---
 
@@ -16,7 +16,7 @@ Before you start, make sure you have:
 | **Node.js 18+** | For `npm install`, `npm run dev`, and building |
 | **Google Chrome** | Extension runs in Chrome |
 | **Groq account** (free) | [console.groq.com](https://console.groq.com) — powers AI generation |
-| **Gmail account** | Emails send from your inbox |
+| **Gmail account** | Your email inbox — one-time connect in Settings so you can send with one click |
 | **Google Cloud account** (free) | Required to enable Gmail API + OAuth for sending |
 | **Resume PDF** | Text-based PDF, under 5 MB |
 
@@ -198,7 +198,7 @@ Edit **Subject**, **To**, and **Body** in the preview. Nothing sends until you c
 
 ### 4. Send
 
-Click **Send via Gmail**. Your resume PDF is attached. The email appears in your Gmail **Sent** folder.
+Click **Send via Gmail** — one click, resume attached, done. The email goes out from your inbox and appears in Sent.
 
 Past sends are logged in **History**.
 

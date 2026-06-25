@@ -5,15 +5,21 @@ import { checkGmailAuth, connectGmail, signOutGmail } from '../lib/gmail'
 export function SettingsTab() {
   const [apiKey, setApiKey] = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
+  const [gmailAvailable, setGmailAvailable] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    const manifest = chrome.runtime.getManifest()
+    setGmailAvailable(!!manifest.oauth2?.client_id)
+
     getSettings().then((s) => {
       setApiKey(s.openrouterApiKey)
       setGmailConnected(s.gmailConnected)
     })
-    checkGmailAuth().then(setGmailConnected)
+    if (manifest.oauth2?.client_id) {
+      checkGmailAuth().then(setGmailConnected)
+    }
   }, [])
 
   const handleSave = async () => {
@@ -75,31 +81,30 @@ export function SettingsTab() {
           Connect Gmail to send emails with your resume attached.
         </p>
 
-        {gmailConnected ? (
-          <div className="gmail-status connected">
-            <span>Connected</span>
+        {gmailAvailable ? (
+          gmailConnected ? (
+            <div className="gmail-status connected">
+              <span>Connected</span>
+              <button
+                className="btn secondary"
+                onClick={handleGmailDisconnect}
+                disabled={loading}
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
             <button
-              className="btn secondary"
-              onClick={handleGmailDisconnect}
+              className="btn primary full"
+              onClick={handleGmailConnect}
               disabled={loading}
             >
-              Disconnect
+              {loading ? 'Connecting…' : 'Connect Gmail'}
             </button>
-          </div>
+          )
         ) : (
-          <button
-            className="btn primary full"
-            onClick={handleGmailConnect}
-            disabled={loading}
-          >
-            {loading ? 'Connecting…' : 'Connect Gmail'}
-          </button>
+          <p className="hint">Gmail is not available in this build.</p>
         )}
-
-        <p className="hint">
-          Requires a Google Cloud OAuth client ID configured in manifest.json.
-          See README for setup instructions.
-        </p>
       </div>
     </div>
   )
